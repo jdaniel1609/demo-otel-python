@@ -1,0 +1,118 @@
+services:
+  # Zipkin - Distributed Tracing UI
+  zipkin:
+    image: openzipkin/zipkin:latest
+    container_name: zipkin
+    ports:
+      - "9411:9411"
+    environment:
+      - STORAGE_TYPE=mem
+    networks:
+      - otel-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9411/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # OpenTelemetry Collector
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "8888:8888"   # Prometheus metrics
+      - "55679:55679" # zpages
+    depends_on:
+      zipkin:
+        condition: service_healthy
+    networks:
+      - otel-network
+
+  # Inventory Service
+  inventory:
+    build:
+      context: ./inventory
+      dockerfile: Dockerfile
+    container_name: inventory-service
+    ports:
+      - "5001:5001"
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SERVICE_NAME=inventory-service
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=inventory-service,deployment.environment=demo
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      otel-collector:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/health').read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - otel-network
+
+  # Payments Service
+  payments:
+    build:
+      context: ./payments
+      dockerfile: Dockerfile
+    container_name: payments-service
+    ports:
+      - "5002:5002"
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SERVICE_NAME=payments-service
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=payments-service,deployment.environment=demo
+      - INVENTORY_URL=http://inventory:5001
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      inventory:
+        condition: service_started
+      otel-collector:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5002/health').read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - otel-network
+
+  # Load Generator
+  load-generator:
+    build:
+      context: ./load-generator
+      dockerfile: Dockerfile
+    container_name: load-generator
+    ports:
+      - "5003:5003"
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SERVICE_NAME=load-generator
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=load-generator,deployment.environment=demo
+      - PAYMENTS_URL=http://payments:5002
+      - LOAD_RPS=10
+      - LOAD_DURATION=300
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      payments:
+        condition: service_started
+      otel-collector:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5003/health').read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - otel-network
+
+networks:
+  otel-network:
+    driver: bridge

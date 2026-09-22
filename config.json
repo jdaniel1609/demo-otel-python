@@ -1,0 +1,60 @@
+{
+  "load_generator": {
+    "target_service": "payments",
+    "target_url": "http://payments:5002/payment/process",
+    "default_rps": 10,
+    "default_duration_seconds": 300,
+    "skus": ["SKU001", "SKU002", "SKU003", "SKU004", "SKU005"],
+    "payment_methods": ["credit_card", "debit_card", "paypal", "apple_pay"],
+    "quantity_range": [1, 5]
+  },
+  "services": {
+    "inventory": {
+      "port": 5001,
+      "endpoints": {
+        "health": "/health",
+        "list": "/inventory",
+        "get": "/inventory/{sku}",
+        "reserve": "/inventory/{sku}/reserve"
+      }
+    },
+    "payments": {
+      "port": 5002,
+      "endpoints": {
+        "health": "/health",
+        "process": "/payment/process",
+        "history": "/payment/history"
+      },
+      "dependencies": ["inventory"]
+    },
+    "load_generator": {
+      "port": 5003,
+      "endpoints": {
+        "health": "/health",
+        "start": "/load/start",
+        "stop": "/load/stop",
+        "status": "/load/status"
+      }
+    },
+    "otel_collector": {
+      "ports": {
+        "otlp_grpc": 4317,
+        "otlp_http": 4318,
+        "prometheus": 8888,
+        "zpages": 55679
+      },
+      "exporters": ["zipkin", "logging"]
+    },
+    "zipkin": {
+      "port": 9411,
+      "ui_url": "http://localhost:9411",
+      "api_url": "http://localhost:9411/api/v2"
+    }
+  },
+  "tracing": {
+    "protocol": "OTLP/gRPC",
+    "collector_endpoint": "http://otel-collector:4317",
+    "exporter": "zipkin",
+    "zipkin_endpoint": "http://zipkin:9411/api/v2/spans"
+  }
+}

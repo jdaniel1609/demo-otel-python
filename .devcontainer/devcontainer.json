@@ -1,0 +1,43 @@
+{
+  "name": "OTel Python Demo",
+  "dockerComposeFile": ["../docker-compose.yml"],
+  "service": "payments",
+  "workspaceFolder": "/workspaces/demo-otel-python",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-azuretools.vscode-docker",
+        "hediet.vscode-drawio",
+        "redhat.vscode-yaml"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.terminal.activateEnvironment": true
+      }
+    }
+  },
+  "forwardPorts": [
+    5001,
+    5002,
+    5003,
+    9411,
+    4317,
+    4318,
+    8888,
+    55679
+  ],
+  "portsAttributes": {
+    "5001": { "label": "Inventory Service", "onAutoForward": "notify" },
+    "5002": { "label": "Payments Service", "onAutoForward": "notify" },
+    "5003": { "label": "Load Generator", "onAutoForward": "notify" },
+    "9411": { "label": "Zipkin UI", "onAutoForward": "openBrowser" },
+    "4317": { "label": "OTel Collector gRPC", "onAutoForward": "ignore" },
+    "4318": { "label": "OTel Collector HTTP", "onAutoForward": "ignore" },
+    "8888": { "label": "OTel Collector Metrics", "onAutoForward": "ignore" },
+    "55679": { "label": "OTel Collector zPages", "onAutoForward": "ignore" }
+  },
+  "postCreateCommand": "echo 'Waiting for services to start...' && sleep 10 && echo 'Services ready!' && echo '' && echo '=== SERVICE URLs ===' && echo 'Inventory:  http://localhost:5001' && echo 'Payments:   http://localhost:5002' && echo 'Load Gen:   http://localhost:5003' && echo 'Zipkin UI:  http://localhost:9411' && echo 'OTel Metrics: http://localhost:8888' && echo '' && echo '=== QUICK TEST ===' && echo 'curl http://localhost:5001/health' && echo 'curl http://localhost:5002/health' && echo 'curl -X POST http://localhost:5003/load/start'",
+  "remoteUser": "root"
+}
